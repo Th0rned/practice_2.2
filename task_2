@@ -1,0 +1,14 @@
+import psutil
+
+def check():
+    cpu = psutil.cpu_percent(interval=2) # Интервал 2 сек.
+    ram = psutil.virtual_memory() # Изначально в битах.
+    disk = psutil.disk_usage('/').percent # Корневой диск - '/'.
+
+    print(f"Загрузка процессора: {cpu}%")
+    print(f"ОЗУ загружен на: {(ram.used / 1024**3):.3f} ГБ ({ram.percent}%)")
+    print(f"Диск занят на: {disk}%\n")
+
+if __name__ == "__main__":
+    for i in range (int(input("Введите число обновлений: "))):
+        check()
