@@ -1,0 +1,33 @@
+import requests, time
+
+a = ["https://github.com/", "https://www.binance.com/en", "https://tomtit.tomsk.ru/", "https://jsonplaceholder.typicode.com", "https://moodle.tomtit-tomsk.ru"]
+
+for i in a:
+    try:
+        start = time.perf_counter()
+        r = requests.get(i)
+
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        print(f"Отправление запроса '{i}' - {elapsed_ms:.0f} мс;")
+
+        b = 0
+        for j in range(100):
+            if r.status_code == (100 + b):
+                print(f"Запрос получен, процесс продолжается - код {r.status_code}.\n")
+                break
+            elif r.status_code == (200 + b):
+                print(f"Запрос успешно принят и обработан - код {r.status_code}.\n")
+                break
+            elif r.status_code == (300 + b):
+                print(f"Для выполнения запроса нужно выполнить другое действие - код {r.status_code}.\n")
+                break
+            elif r.status_code == (400 + b):
+                print(f"Ошибка в запросе, страница не найдена или нет доступа - код {r.status_code}.\n")
+                break
+            elif r.status_code == (500 + b):
+                print(f"Сервер не выполнил запрос - код {r.status_code}.\n")
+                break
+            b = b + 1
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка - {e}\n")
