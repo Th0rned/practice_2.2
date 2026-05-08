@@ -1,0 +1,133 @@
+import socket
+import os
+import json
+import struct
+import xml.etree.ElementTree
+
+
+def process_data(data: bytes, key: int, decrypt=False) -> bytes:
+    result = bytearray()
+
+    for byte in data:
+        if not decrypt:
+            processed = ((byte << 2) | (byte >> 6)) & 0xFF
+            processed ^= key
+        else:
+            byte ^= key
+            processed = ((byte >> 2) | (byte << 6)) & 0xFF
+
+        result.append(processed)
+
+    return bytes(result)
+
+
+def send_data(sock, data: bytes):
+    sock.sendall(struct.pack("!I", len(data)))
+    sock.sendall(data)
+
+
+def recv_exact(sock, n):
+    data = b''
+    while len(data) < n:
+        packet = sock.recv(n - len(data))
+        if not packet:
+            return None
+        data += packet
+    return data
+
+
+def recv_data(sock):
+    raw_len = recv_exact(sock, 4)
+    if not raw_len:
+        return None
+    length = struct.unpack("!I", raw_len)[0]
+    return recv_exact(sock, length)
+
+
+def validate_json(data):
+    try:
+        json.loads(data.decode())
+        return True
+    except json.decoder.JSONDecodeError:
+        return False
+
+
+def validate_xml(data):
+    try:
+        xml.etree.ElementTree.fromstring(data.decode())
+        return True
+    except xml.etree.ElementTree.ParseError:
+        return False
+
+
+def handle_client(conn):
+    try:
+        cmd_data = recv_data(conn)
+        if not cmd_data:
+            return
+
+        command = json.loads(cmd_data.decode())
+
+        action = command.get("action")
+        filename = command.get("filename")
+
+        if action == "upload":
+            file_data = recv_data(conn)
+
+            if filename.endswith(".json"):
+                if not validate_json(file_data):
+                    send_data(conn, b"ERROR: Invalid JSON")
+                    return
+
+            elif filename.endswith(".xml"):
+                if not validate_xml(file_data):
+                    send_data(conn, b"ERROR: Invalid XML")
+                    return
+
+            encrypted = process_data(file_data, KEY)
+
+            bin_name = filename + ".bin"
+            path = os.path.join(STORAGE_DIR, bin_name)
+
+            with open(path, "wb") as f:
+                f.write(encrypted)
+
+            send_data(conn, f"OK: {bin_name}".encode())
+
+        elif action == "download":
+            path = os.path.join(STORAGE_DIR, filename)
+
+            if not os.path.exists(path):
+                send_data(conn, b"ERROR: File not found")
+                return
+
+            with open(path, "rb") as f:
+                data = f.read()
+
+            send_data(conn, data)
+
+    finally:
+        conn.close()
+
+
+def start():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen()
+
+        print("Server started...")
+
+        while True:
+            conn, addr = s.accept()
+            print("Client:", addr)
+            handle_client(conn)
+
+
+if __name__ == "__main__":
+    HOST = '0.0.0.0'
+    PORT = 5001
+    KEY = 0x42
+    STORAGE_DIR = 'server_storage'
+    os.makedirs(STORAGE_DIR, exist_ok=True)
+
+    start()
