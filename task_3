@@ -1,0 +1,160 @@
+import requests
+import json
+import os
+
+def get_currency():
+    try:
+        response = requests.get("https://www.cbr-xml-daily.ru/daily_json.js")
+        data = response.json()
+        return data["Valute"]
+    except Exception as e:
+        print("\nОшибка при получении данных:", e)
+        return {}
+
+
+def all_currencies(currencies):
+    for code, info in currencies.items():
+        print(f"{code}: {info['Name']} = {info['Value']} RUB")
+
+
+def currency_by_code(currencies, code):
+    code = code.upper()
+    if code in currencies:
+        info = currencies[code]
+        print(f"{code}: {info['Name']} = {info['Value']} RUB")
+    else:
+        print("Валюта не найдена.")
+
+
+def load_groups():
+    if not os.path.exists("save.json"):
+        return {}
+
+    with open("save.json", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_groups(groups):
+    with open("save.json", "w", encoding="utf-8") as f:
+        json.dump(groups, f, indent=4, ensure_ascii=False)
+
+
+def create_group(groups):
+    name = input("\nВведите имя группы: ")
+    if name in groups:
+        print("Группа уже существует.")
+        return
+
+    groups[name] = []
+    print("Группа создана.")
+
+
+def show_groups(groups):
+    if not groups:
+        print("\nГрупп нет.")
+        return
+
+    for name, currencies in groups.items():
+        if currencies:
+            print(f"\n{name}: {', '.join(currencies)}")
+        else:
+            print(f"\n{name}: Валют нет.")
+
+
+def add_to_group(groups):
+    name = input("\nВведите имя группы: ")
+    if name not in groups:
+        print("Группа не найдена.")
+        return
+
+    code = input("Введите код валюты: ").upper()
+    if code not in groups[name]:
+        groups[name].append(code)
+        print("\nВалюта добавлена.")
+    else:
+        print("\nВалюта уже в группе.")
+
+
+def remove_from_group(groups):
+    name = input("\nВведите имя группы: ")
+    if name not in groups:
+        print("Группа не найдена.")
+        return
+
+    code = input("Введите код валюты: ").upper()
+    if code in groups[name]:
+        groups[name].remove(code)
+        print("\nВалюта удалена.")
+    else:
+        print("\nВалюта не найдена в группе.")
+
+
+def group_currencies(groups, currencies):
+    name = input("\nВведите имя группы: ")
+    if name not in groups:
+        print("Группа не найдена.")
+        return
+
+    if not groups[name]:
+        print("Группа пуста.")
+        return
+
+    print()
+    for code in groups[name]:
+        if code in currencies:
+            info = currencies[code]
+            print(f"{code}: {info['Name']} = {info['Value']} RUB.")
+        else:
+            print(f"{code}: данных нет.")
+
+
+def main():
+    groups = load_groups()
+    currencies = get_currency()
+
+    print("""\nПожалуйста, выберите:
+1) Вывести список валют;
+2) Вывести конкретную валюту;
+3) Вывести список групп;
+4) Вывести список валют из группы;
+5) Создать группу валют;
+6) Добавить валюту в группу;
+7) Удалить валюту из группы;
+0) Завершить работу.""")
+
+    match input("Действие: "):
+        case "1":
+            print()
+            all_currencies(currencies)
+            main()
+        case "2":
+            a = input("\nВведите код валюты: ")
+            currency_by_code(currencies, a)
+            main()
+        case "3":
+            show_groups(groups)
+            main()
+        case "4":
+            group_currencies(groups, currencies)
+            main()
+        case "5":
+            create_group(groups)
+            save_groups(groups)
+            main()
+        case "6":
+            add_to_group(groups)
+            save_groups(groups)
+            main()
+        case "7":
+            remove_from_group(groups)
+            save_groups(groups)
+            main()
+        case "0":
+            print("\nЗавершение работы...")
+            exit(0)
+        case _:
+            main()
+
+
+if __name__ == "__main__":
+    main()
