@@ -1,0 +1,114 @@
+import socket
+import json
+import struct
+import os
+
+
+def process_data(data: bytes, key: int, decrypt=False) -> bytes:
+    result = bytearray()
+
+    for byte in data:
+        if not decrypt:
+            processed = ((byte << 2) | (byte >> 6)) & 0xFF
+            processed ^= key
+        else:
+            byte ^= key
+            processed = ((byte >> 2) | (byte << 6)) & 0xFF
+
+        result.append(processed)
+
+    return bytes(result)
+
+
+def send_data(sock, data: bytes):
+    sock.sendall(struct.pack("!I", len(data)))
+    sock.sendall(data)
+
+
+def recv_exact(sock, n):
+    data = b''
+    while len(data) < n:
+        packet = sock.recv(n - len(data))
+        if not packet:
+            break
+        data += packet
+    return data
+
+
+def recv_data(sock):
+    raw_len = recv_exact(sock, 4)
+    if not raw_len:
+        return None
+    length = struct.unpack("!I", raw_len)[0]
+    return recv_exact(sock, length)
+
+
+def upload(filepath):
+    if not os.path.exists(filepath):
+        print("Нет файла")
+        return
+
+    filename = os.path.basename(filepath)
+
+    with open(filepath, "rb") as f:
+        data = f.read()
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((HOST, PORT))
+
+        cmd = {"action": "upload", "filename": filename}
+        send_data(s, json.dumps(cmd).encode())
+        send_data(s, data)
+
+        response = recv_data(s)
+        print(response.decode())
+
+
+def download(filename):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((HOST, PORT))
+
+        cmd = {"action": "download", "filename": filename}
+        send_data(s, json.dumps(cmd).encode())
+
+        data = recv_data(s)
+
+        if data.startswith(b"ERROR"):
+            print(data.decode())
+            return
+
+        decrypted = process_data(data, KEY, decrypt=True)
+
+        output_path = os.path.join("client_download", filename.replace(".bin", ""))
+
+        with open(output_path, "wb") as f:
+            f.write(decrypted)
+
+        print("Saved to:", output_path)
+
+
+def main():
+    print("\n1) Upload\n2) Download\n0) Exit")
+    match input("> "):
+        case "1":
+            path = input("Absolute path: ")
+            upload(path)
+            main()
+        case "2":
+            name = input("Filename: ") + ".bin"
+            download(name)
+            main()
+        case "0":
+            print("Shutting down...")
+            exit(0)
+        case _:
+            main()
+
+
+if __name__ == "__main__":
+    HOST = '127.0.0.1'
+    PORT = 5001
+    KEY = 0x42
+    os.makedirs("client_download", exist_ok=True)
+
+    main()
