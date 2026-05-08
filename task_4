@@ -1,0 +1,94 @@
+import requests
+
+
+def get_user_profile(username):
+    url = f"{"https://api.github.com"}/users/{username}"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        print("Пользователь не найден")
+        return
+
+    data = response.json()
+
+    print(f"""\n===== ПРОФИЛЬ =====
+Имя: {data.get('name')}
+Логин: {data.get('login')}
+Ссылка: {data.get('html_url')}
+Публичные репозитории: {data.get('public_repos')}
+Подписки: {data.get('following')}
+Подписчики: {data.get('followers')}
+Описание: {data.get('bio')}""")
+
+
+def get_user_repos(username):
+    url = f"{"https://api.github.com"}/users/{username}/repos"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        print("Ошибка получения репозиториев")
+        return
+
+    repos = response.json()
+
+    if not repos:
+        print("Нет репозиториев")
+        return
+
+    print("\n===== РЕПОЗИТОРИИ =====")
+
+    for repo in repos:
+        print(f"""Название: {repo.get('name')}
+Ссылка: {repo.get('html_url')}
+Язык: {repo.get('language')}
+Видимость: {'private' if repo.get('private') else 'public'}
+Основная ветка: {repo.get('default_branch')}
+""")
+
+
+def search_repositories(query):
+    url = f"{"https://api.github.com"}/search/repositories?q={query}"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        print("Ошибка поиска")
+        return
+
+    data = response.json()
+    items = data.get("items", [])
+
+    print(f"\n===== РЕЗУЛЬТАТЫ ПОИСКА ({len(items)}) =====")
+
+    for repo in items[:10]:
+        print(f"\nНазвание: {repo.get('name')}")
+        print(f"Владелец: {repo.get('owner', {}).get('login')}")
+        print(f"Ссылка: {repo.get('html_url')}")
+        print(f"Язык: {repo.get('language')}")
+
+
+def main():
+    print("""\nПожалуйста, выберите:
+1) Вывести профиль пользователя;
+2) Вывести репозитории пользователя;
+3) Найти репозиторий;
+0) Завершить работу.""")
+
+    match input("Действие: "):
+        case "1":
+            get_user_profile(str(input("\nВведите username: ")))
+            main()
+        case "2":
+            get_user_repos(str(input("\nВведите username: ")))
+            main()
+        case "3":
+            search_repositories(str(input("\nВведите название репозитория: ")))
+            main()
+        case "0":
+            print("\nЗавершение работы...")
+            exit(0)
+        case _:
+            main()
+
+
+if __name__ == "__main__":
+    main()
